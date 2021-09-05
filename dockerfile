@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
+
+ARG APISERVER=localhost
 FROM node as builder
 
-ARG API_SERVER = localhost
 RUN apt update
 RUN apt install -y git
 WORKDIR /app1
