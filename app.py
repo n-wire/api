@@ -9,6 +9,7 @@ from pymongo.errors import DuplicateKeyError
 import asyncio
 from nodewire import Message
 import os
+import aiofiles
 
 CP = os.environ['CP']
 
@@ -19,7 +20,6 @@ CORS(app, supports_credentials=True)
 app.config.SECRET = "this is my secret"
 app.blueprint(login)
 app.ctx.db = Admin()
-#app.static("/static", "/static")
 app.static('/', './frontend')
 
 @app.listener("before_server_start")
@@ -134,6 +134,24 @@ async def save_app(request):
         return text('success')
     except Exception as ex:
         return text(str(ex))
+
+@app.route("/upload", methods=['POST'])
+@protected
+async def upload(request):
+    if not os.path.exists('./storage/'+request.ctx.instance):
+        os.makedirs('./storage/'+request.ctx.instance)
+    print('file', request.files)
+    async with aiofiles.open('./storage/'+request.ctx.instance+"/"+request.files["file"][0].name, 'wb') as f:
+        await f.write(request.files["file"][0].body)
+    f.close()
+
+    return text('success')
+
+@app.route('/storage/<filename:string>')
+@protected
+async def storage(request, filename:str):
+    return await file('./storage/'+request.ctx.instance+"/"+filename)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, access_log=True)

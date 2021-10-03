@@ -248,7 +248,7 @@ class Admin():
         user['last_seen'] = time.time()
         self.data.users.update({'email': email}, user)
         instance = self.data.instances.find_one({'instance_id': user['instance']})
-        server = self.determine_server(user['instance'])
+        # server = self.determine_server(user['instance'])
         is_admin = len([u for u in instance['users'] if u['user_instance_and_node_name']==user['instance']+':'+email and u['admin']])!=0
         if instance['config']['cp_address'] != server:
             instance['config']['cp_address'] = server
@@ -256,7 +256,7 @@ class Admin():
             self.data.instances.update({'instance_id': user['instance']}, instance)
         config = {'username': user['email'], 'instance': user['instance'],
                   'fullname': user['fullname'],
-                  'server': server, 'password': user['password'],
+                  #'server': server, 'password': user['password'],
                   'trust_zones': user['trust_zones'],
                   'gateways': user['gateways'] if 'gateways' in user else [],
                   'Nodes': instance['registered_nodes'] if is_admin else [],
@@ -265,40 +265,11 @@ class Admin():
 
         return config
 
-    def determine_server(self, gateway):
-        '''
-        THis function works in conjunction  with the pinger program.
-        the pinger monitors all instances of nodewire servers and helps maintains a list of available servers.
-        this function selects from that list.
-        :param gateway:
-        :return:
-        '''
-        live_gateway = self.data.live_gateways.find_one({'instance': gateway})
-        if not live_gateway:
-            self.data.live_gateways.insert({'instance': gateway, 'count': 0})
-        if live_gateway and live_gateway['count']!=0: # chose same server as fellow gateways, if a gateway is already connected
-            instance = self.data.instances.find_one({'instance_id': gateway})
-            d_instance = self.data.servers.find({'ip': instance['config']['cp_address']})
-            if d_instance.count()!=0:
-                return instance['config']['cp_address']
-
-        if self.data.servers.find_one({'ip': connectedip()}):
-            return connectedip() # otherwise, we are free to chose the current server if one exists
-        else:
-            servers = self.data.servers.find({'public': True}) # else chose any available server
-            if servers.count() != 0 :
-                n = int(random.random()*servers.count())
-                return servers[n]['ip']
-            else:
-                raise Exception('No server found')
-
     def create_app(self, owner, title, layout=[], script = [], sketch = [], icon = ''):
         app = {
-            'icon': icon,
-            'layout': layout,
             'title': title,
-            'script': script,
-            'sketch': sketch,
+            'pages': layout,
+            'sketches': sketch,
             'owner': owner
         }
         user = self.data.users.find_one({'email': owner})
@@ -326,7 +297,10 @@ class Admin():
             app['owner'] = owner
             self.data.apps.update({'title': app['title'], 'owner': owner}, app)
         else:
-            raise Exception("can't save")
+            user['apps'].append(app['title'])
+            app['owner'] = owner
+            self.data.apps.insert_one(app)
+            self.data.users.update({'email': owner}, user)
 
     def list_apps(self, owner):
         user = self.data.users.find_one({'email': owner}, {'apps':1})
